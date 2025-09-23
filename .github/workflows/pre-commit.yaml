@@ -8,9 +8,8 @@ on:
 
 jobs:
   pre-commit:
+    name: Run pre-commit
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
 
     steps:
       - name: Checkout repository
