@@ -21,4 +21,4 @@ jobs:
 
       - name: Run tests
         run: |
-          just test
+          go test -cover -race -v ./...
