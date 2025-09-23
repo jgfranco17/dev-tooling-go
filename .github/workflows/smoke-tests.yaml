@@ -1,0 +1,29 @@
+name: Smoke Tests
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 * * * *" # Every hour
+
+jobs:
+  smoke-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        url:
+          - https://aeternum-api.onrender.com
+          - https://aeternum-api-stg.onrender.com
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Run smoke tests
+        env:
+          API_BASE_URL: ${{ matrix.url }}
+        run: |
+          go run external-tests/smoke/main.go
