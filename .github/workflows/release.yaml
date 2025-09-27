@@ -140,7 +140,11 @@ jobs:
             COMMITS=$(git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD)
           fi
 
-          echo "changelog=$CHANGELOG" >> $GITHUB_OUTPUT
+          {
+            echo 'changelog<<EOF'
+            echo "$CHANGELOG"
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
 
       - name: Create tag
         if: steps.check_version.outputs.should_release == 'true'
