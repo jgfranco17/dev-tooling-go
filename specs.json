@@ -1,6 +1,6 @@
 {
   "author": "Joaquin Gabriel Franco",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "repository": "https://github.com/jgfranco17/dev-tooling-go",
   "languages": ["Go"],
   "active": true

@@ -34,7 +34,7 @@ func New(stream io.Writer, level logrus.Level) *logrus.Logger {
 	return logger
 }
 
-func WithContext(ctx context.Context, logger *logrus.Logger) context.Context {
+func AddToContext(ctx context.Context, logger *logrus.Logger) context.Context {
 	return context.WithValue(ctx, contextKey, logger)
 }
 
