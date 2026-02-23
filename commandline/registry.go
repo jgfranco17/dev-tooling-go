@@ -105,8 +105,10 @@ func New(options RootCommandOptions) (*CLI, error) {
 			signal.Notify(c, syscall.SIGTERM, syscall.SIGINT)
 
 			go func(localCancel context.CancelFunc, localCtx context.Context) {
-				defer close(signalDone)
-				defer signal.Stop(c)
+				defer func() {
+					signal.Stop(c)
+					close(signalDone)
+				}()
 
 				select {
 				case <-c:
