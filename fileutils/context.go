@@ -18,10 +18,10 @@ func ApplyRootDirToContext(ctx context.Context, files fs.FS) context.Context {
 }
 
 // RootDirFromContext retrieves the fs.FS from the context.
-// It panics if the value is not found or of the wrong type.
+// It panics if the value is not found, is of the wrong type, or is nil.
 func RootDirFromContext(ctx context.Context) fs.FS {
 	rootDir, ok := ctx.Value(rootDirKey).(fs.FS)
-	if !ok {
+	if !ok || rootDir == nil {
 		panic("No root dir found in context, bad code path")
 	}
 	return rootDir

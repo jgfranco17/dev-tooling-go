@@ -3,7 +3,6 @@ package commandline
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/signal"
 	"syscall"
 
@@ -14,9 +13,8 @@ import (
 
 // CLI is a struct that represents the command-line interface of the application.
 type CLI struct {
-	root      *cobra.Command
-	verbosity int
-	cleanups  []func() // Function to clean up resources
+	root     *cobra.Command
+	cleanups []func()
 }
 
 // ContextModifiers is a function type that takes a context and returns
@@ -65,16 +63,18 @@ func New(options RootCommandOptions) (*CLI, error) {
 		return nil, err
 	}
 
-	var verbosity int
-	var cancelFunc context.CancelFunc
-	var signalDone chan struct{}
+	// Create a signal-aware context for the entire CLI lifecycle once here.
+	// This ensures signal handling is never duplicated regardless of how many
+	// commands are executed or how many times PersistentPreRunE fires.
+	signalCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 
+	var verbosity int
 	root := &cobra.Command{
 		Use:     options.Name,
 		Version: options.Version,
 		Short:   options.Description,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			verbosity, _ := cmd.Flags().GetCount("verbose")
+			verbosity, _ = cmd.Flags().GetCount("verbose")
 			var level logrus.Level
 			switch verbosity {
 			case 1:
@@ -90,74 +90,47 @@ func New(options RootCommandOptions) (*CLI, error) {
 			logger := logging.New(cmd.ErrOrStderr(), level)
 			ctx := logging.AddToContext(cmd.Context(), logger)
 
-			// Apply context modifiers
-			for _, modifierFunc := range options.Modifiers {
-				ctx = modifierFunc(ctx)
-			}
-
-			// Setup signal handling with proper cleanup
-			ctx, cancel := context.WithCancel(ctx)
-			cancelFunc = cancel
-
-			// Start signal handler in a separate goroutine
-			signalDone = make(chan struct{})
-			c := make(chan os.Signal, 1)
-			signal.Notify(c, syscall.SIGTERM, syscall.SIGINT)
-
-			go func(localCancel context.CancelFunc, localCtx context.Context) {
-				defer func() {
-					signal.Stop(c)
-					close(signalDone)
-				}()
-
-				select {
-				case <-c:
-					localCancel()
-				case <-localCtx.Done():
-					// Context was cancelled elsewhere, clean exit
+			if options.Modifiers != nil {
+				for _, modifier := range options.Modifiers {
+					ctx = modifier(ctx)
 				}
-			}(cancel, ctx)
+			}
 
 			cmd.SetContext(ctx)
 			return nil
 		},
 	}
 
+	// Prime the root command with the signal-aware context so every derived
+	// command context inherits cancellation on SIGTERM/SIGINT.
+	root.SetContext(signalCtx)
 	root.PersistentFlags().CountVarP(&verbosity, "verbose", "v", "Increase verbosity (up to -vvv)")
 
-	// Combine user cleanup functions with internal cleanup
-	allCleanups := []func(){}
-	allCleanups = append(options.CleanupFuncs, func() {
-		if cancelFunc != nil {
-			cancelFunc()
-		}
-		if signalDone != nil {
-			<-signalDone // Wait for signal handler to finish
-		}
-	})
+	// Internal cleanup (stop) is prepended so signal notifications are released
+	// before user-provided cleanup functions run.
+	allCleanups := make([]func(), 0, 1+len(options.CleanupFuncs))
+	allCleanups = append(allCleanups, stop)
+	allCleanups = append(allCleanups, options.CleanupFuncs...)
 
 	return &CLI{
-		root:      root,
-		verbosity: verbosity,
-		cleanups:  allCleanups,
+		root:     root,
+		cleanups: allCleanups,
 	}, nil
 }
 
-// RegisterCommands registers new commands with the CLI
+// RegisterCommands registers new commands with the CLI.
 func (cr *CLI) RegisterCommands(commands []*cobra.Command) {
 	cr.root.AddCommand(commands...)
 }
 
-// Cleanup cleans up resources used by the CLI
+// Cleanup releases resources held by the CLI.
 func (cr *CLI) Cleanup() {
-	if cr.cleanups != nil {
-		for _, cleanupFunc := range cr.cleanups {
-			cleanupFunc()
-		}
+	for _, cleanup := range cr.cleanups {
+		cleanup()
 	}
 }
 
-// Execute executes the root command
+// Execute executes the root command.
 func (cr *CLI) Execute() error {
 	return cr.root.Execute()
 }

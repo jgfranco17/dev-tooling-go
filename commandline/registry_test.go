@@ -144,18 +144,15 @@ func TestNew_WithModifiers(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, cli)
 
-	// Execute a dummy command to trigger PersistentPreRunE
 	testCmd := &cobra.Command{
 		Use: "test",
 		Run: func(cmd *cobra.Command, args []string) {
-			// Verify context modifier was applied
 			value := cmd.Context().Value("test")
 			assert.Equal(t, "value", value)
 		},
 	}
 	cli.RegisterCommands([]*cobra.Command{testCmd})
 
-	// Set up a buffer to capture output
 	var buf bytes.Buffer
 	cli.root.SetOut(&buf)
 	cli.root.SetErr(&buf)
@@ -165,7 +162,6 @@ func TestNew_WithModifiers(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, modifierCalled)
 
-	// Test cleanup
 	cli.Cleanup()
 	assert.True(t, cleanupCalled)
 }
@@ -180,15 +176,12 @@ func TestRegisterCommands(t *testing.T) {
 	cli, err := New(options)
 	require.NoError(t, err)
 
-	// Initially no subcommands
 	assert.Empty(t, cli.root.Commands())
 
-	// Register some commands
 	cmd1 := &cobra.Command{Use: "command1"}
 	cmd2 := &cobra.Command{Use: "command2"}
 	cli.RegisterCommands([]*cobra.Command{cmd1, cmd2})
 
-	// Verify commands were registered
 	commands := cli.root.Commands()
 	assert.Len(t, commands, 2)
 
@@ -254,7 +247,6 @@ func TestVerbosityLevels(t *testing.T) {
 			}
 			cli.RegisterCommands([]*cobra.Command{testCmd})
 
-			// Set up buffers to capture output
 			var buf bytes.Buffer
 			cli.root.SetOut(&buf)
 			cli.root.SetErr(&buf)
@@ -264,7 +256,6 @@ func TestVerbosityLevels(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedLevel, actualLevel)
 
-			// Test cleanup
 			cli.Cleanup()
 			assert.True(t, cleanupCalled)
 		})
@@ -363,7 +354,48 @@ func TestContextModifiers(t *testing.T) {
 	assert.True(t, modifier1Called)
 	assert.True(t, modifier2Called)
 
-	// Test cleanup
 	cli.Cleanup()
 	assert.True(t, cleanupCalled)
+}
+
+func TestCleanup_WithoutExecute(t *testing.T) {
+	var cleanupCalled bool
+	options := RootCommandOptions{
+		Name:    "testcli",
+		Version: "1.0.0",
+		CleanupFuncs: []func(){
+			func() { cleanupCalled = true },
+		},
+	}
+
+	cli, err := New(options)
+	require.NoError(t, err)
+
+	assert.NotPanics(t, func() { cli.Cleanup() })
+	assert.True(t, cleanupCalled)
+}
+
+func TestCleanup_Order(t *testing.T) {
+	var order []string
+
+	options := RootCommandOptions{
+		Name:    "testcli",
+		Version: "1.0.0",
+		CleanupFuncs: []func(){
+			func() { order = append(order, "user1") },
+			func() { order = append(order, "user2") },
+		},
+	}
+
+	cli, err := New(options)
+	require.NoError(t, err)
+
+	original := cli.cleanups[0]
+	cli.cleanups[0] = func() {
+		order = append(order, "internal")
+		original()
+	}
+
+	cli.Cleanup()
+	assert.Equal(t, []string{"internal", "user1", "user2"}, order)
 }
