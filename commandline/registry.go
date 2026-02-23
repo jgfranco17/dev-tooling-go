@@ -16,6 +16,7 @@ import (
 type CLI struct {
 	root      *cobra.Command
 	verbosity int
+	cleanups  []func() // Function to clean up resources
 }
 
 // ContextModifiers is a function type that takes a context and returns
@@ -40,6 +41,11 @@ type RootCommandOptions struct {
 	// This can be used to add additional values to the context, such as a logger
 	// or other dependencies.
 	Modifiers []ContextModifiers
+
+	// CleanupFuncs are functions that will be called when the CLI is cleaned up.
+	// This can be used to clean up resources, such as closing database connections
+	// or stopping background goroutines.
+	CleanupFuncs []func()
 }
 
 // validate checks if the required fields in RootCommandOptions are set.
@@ -60,6 +66,9 @@ func New(options RootCommandOptions) (*CLI, error) {
 	}
 
 	var verbosity int
+	var cancelFunc context.CancelFunc
+	var signalDone chan struct{}
+
 	root := &cobra.Command{
 		Use:     options.Name,
 		Version: options.Version,
@@ -81,20 +90,31 @@ func New(options RootCommandOptions) (*CLI, error) {
 			logger := logging.New(cmd.ErrOrStderr(), level)
 			ctx := logging.AddToContext(cmd.Context(), logger)
 
-			ctx, cancel := context.WithCancel(ctx)
-			c := make(chan os.Signal, 1)
-			signal.Notify(c, syscall.SIGTERM, syscall.SIGINT)
-			go func() {
-				select {
-				case <-c:
-					cancel()
-				case <-ctx.Done():
-				}
-			}()
-
+			// Apply context modifiers
 			for _, modifierFunc := range options.Modifiers {
 				ctx = modifierFunc(ctx)
 			}
+
+			// Setup signal handling with proper cleanup
+			ctx, cancel := context.WithCancel(ctx)
+			cancelFunc = cancel
+
+			// Start signal handler in a separate goroutine
+			signalDone = make(chan struct{})
+			c := make(chan os.Signal, 1)
+			signal.Notify(c, syscall.SIGTERM, syscall.SIGINT)
+
+			go func(localCancel context.CancelFunc, localCtx context.Context) {
+				defer close(signalDone)
+				defer signal.Stop(c)
+
+				select {
+				case <-c:
+					localCancel()
+				case <-localCtx.Done():
+					// Context was cancelled elsewhere, clean exit
+				}
+			}(cancel, ctx)
 
 			cmd.SetContext(ctx)
 			return nil
@@ -102,15 +122,37 @@ func New(options RootCommandOptions) (*CLI, error) {
 	}
 
 	root.PersistentFlags().CountVarP(&verbosity, "verbose", "v", "Increase verbosity (up to -vvv)")
+
+	// Combine user cleanup functions with internal cleanup
+	allCleanups := []func(){}
+	allCleanups = append(options.CleanupFuncs, func() {
+		if cancelFunc != nil {
+			cancelFunc()
+		}
+		if signalDone != nil {
+			<-signalDone // Wait for signal handler to finish
+		}
+	})
+
 	return &CLI{
 		root:      root,
 		verbosity: verbosity,
+		cleanups:  allCleanups,
 	}, nil
 }
 
 // RegisterCommands registers new commands with the CLI
 func (cr *CLI) RegisterCommands(commands []*cobra.Command) {
 	cr.root.AddCommand(commands...)
+}
+
+// Cleanup cleans up resources used by the CLI
+func (cr *CLI) Cleanup() {
+	if cr.cleanups != nil {
+		for _, cleanupFunc := range cr.cleanups {
+			cleanupFunc()
+		}
+	}
 }
 
 // Execute executes the root command

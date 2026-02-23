@@ -123,6 +123,8 @@ func TestNew(t *testing.T) {
 
 func TestNew_WithModifiers(t *testing.T) {
 	var modifierCalled bool
+	var cleanupCalled bool
+
 	modifier := func(ctx context.Context) context.Context {
 		modifierCalled = true
 		return context.WithValue(ctx, "test", "value")
@@ -133,6 +135,9 @@ func TestNew_WithModifiers(t *testing.T) {
 		Description: "A test CLI application",
 		Version:     "1.0.0",
 		Modifiers:   []ContextModifiers{modifier},
+		CleanupFuncs: []func(){
+			func() { cleanupCalled = true },
+		},
 	}
 
 	cli, err := New(options)
@@ -159,6 +164,10 @@ func TestNew_WithModifiers(t *testing.T) {
 	err = cli.Execute()
 	assert.NoError(t, err)
 	assert.True(t, modifierCalled)
+
+	// Test cleanup
+	cli.Cleanup()
+	assert.True(t, cleanupCalled)
 }
 
 func TestRegisterCommands(t *testing.T) {
@@ -221,10 +230,15 @@ func TestVerbosityLevels(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			var cleanupCalled bool
+
 			options := RootCommandOptions{
 				Name:        "testcli",
 				Description: "A test CLI application",
 				Version:     "1.0.0",
+				CleanupFuncs: []func(){
+					func() { cleanupCalled = true },
+				},
 			}
 
 			cli, err := New(options)
@@ -249,6 +263,10 @@ func TestVerbosityLevels(t *testing.T) {
 			err = cli.Execute()
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedLevel, actualLevel)
+
+			// Test cleanup
+			cli.Cleanup()
+			assert.True(t, cleanupCalled)
 		})
 	}
 }
@@ -300,6 +318,7 @@ func TestExecute_VersionFlag(t *testing.T) {
 func TestContextModifiers(t *testing.T) {
 	modifier1Called := false
 	modifier2Called := false
+	cleanupCalled := false
 
 	modifier1 := func(ctx context.Context) context.Context {
 		modifier1Called = true
@@ -316,6 +335,9 @@ func TestContextModifiers(t *testing.T) {
 		Description: "A test CLI application",
 		Version:     "1.0.0",
 		Modifiers:   []ContextModifiers{modifier1, modifier2},
+		CleanupFuncs: []func(){
+			func() { cleanupCalled = true },
+		},
 	}
 
 	cli, err := New(options)
@@ -337,7 +359,11 @@ func TestContextModifiers(t *testing.T) {
 	cli.root.SetArgs([]string{"test"})
 
 	err = cli.Execute()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, modifier1Called)
 	assert.True(t, modifier2Called)
+
+	// Test cleanup
+	cli.Cleanup()
+	assert.True(t, cleanupCalled)
 }
