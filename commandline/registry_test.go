@@ -112,10 +112,10 @@ func TestNew(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, cli)
-				assert.NotNil(t, cli.rootCmd)
-				assert.Equal(t, tt.options.Name, cli.rootCmd.Use)
-				assert.Equal(t, tt.options.Version, cli.rootCmd.Version)
-				assert.Equal(t, tt.options.Description, cli.rootCmd.Short)
+				assert.NotNil(t, cli.root)
+				assert.Equal(t, tt.options.Name, cli.root.Use)
+				assert.Equal(t, tt.options.Version, cli.root.Version)
+				assert.Equal(t, tt.options.Description, cli.root.Short)
 			}
 		})
 	}
@@ -152,9 +152,9 @@ func TestNew_WithModifiers(t *testing.T) {
 
 	// Set up a buffer to capture output
 	var buf bytes.Buffer
-	cli.rootCmd.SetOut(&buf)
-	cli.rootCmd.SetErr(&buf)
-	cli.rootCmd.SetArgs([]string{"test"})
+	cli.root.SetOut(&buf)
+	cli.root.SetErr(&buf)
+	cli.root.SetArgs([]string{"test"})
 
 	err = cli.Execute()
 	assert.NoError(t, err)
@@ -172,7 +172,7 @@ func TestRegisterCommands(t *testing.T) {
 	require.NoError(t, err)
 
 	// Initially no subcommands
-	assert.Empty(t, cli.rootCmd.Commands())
+	assert.Empty(t, cli.root.Commands())
 
 	// Register some commands
 	cmd1 := &cobra.Command{Use: "command1"}
@@ -180,7 +180,7 @@ func TestRegisterCommands(t *testing.T) {
 	cli.RegisterCommands([]*cobra.Command{cmd1, cmd2})
 
 	// Verify commands were registered
-	commands := cli.rootCmd.Commands()
+	commands := cli.root.Commands()
 	assert.Len(t, commands, 2)
 
 	commandNames := make([]string, len(commands))
@@ -242,9 +242,9 @@ func TestVerbosityLevels(t *testing.T) {
 
 			// Set up buffers to capture output
 			var buf bytes.Buffer
-			cli.rootCmd.SetOut(&buf)
-			cli.rootCmd.SetErr(&buf)
-			cli.rootCmd.SetArgs(tt.args)
+			cli.root.SetOut(&buf)
+			cli.root.SetErr(&buf)
+			cli.root.SetArgs(tt.args)
 
 			err = cli.Execute()
 			assert.NoError(t, err)
@@ -264,9 +264,9 @@ func TestExecute_HelpFlag(t *testing.T) {
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
-	cli.rootCmd.SetOut(&buf)
-	cli.rootCmd.SetErr(&buf)
-	cli.rootCmd.SetArgs([]string{"--help"})
+	cli.root.SetOut(&buf)
+	cli.root.SetErr(&buf)
+	cli.root.SetArgs([]string{"--help"})
 
 	err = cli.Execute()
 	assert.NoError(t, err)
@@ -286,9 +286,9 @@ func TestExecute_VersionFlag(t *testing.T) {
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
-	cli.rootCmd.SetOut(&buf)
-	cli.rootCmd.SetErr(&buf)
-	cli.rootCmd.SetArgs([]string{"--version"})
+	cli.root.SetOut(&buf)
+	cli.root.SetErr(&buf)
+	cli.root.SetArgs([]string{"--version"})
 
 	err = cli.Execute()
 	assert.NoError(t, err)
@@ -332,9 +332,9 @@ func TestContextModifiers(t *testing.T) {
 	cli.RegisterCommands([]*cobra.Command{testCmd})
 
 	var buf bytes.Buffer
-	cli.rootCmd.SetOut(&buf)
-	cli.rootCmd.SetErr(&buf)
-	cli.rootCmd.SetArgs([]string{"test"})
+	cli.root.SetOut(&buf)
+	cli.root.SetErr(&buf)
+	cli.root.SetArgs([]string{"test"})
 
 	err = cli.Execute()
 	assert.NoError(t, err)

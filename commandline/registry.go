@@ -14,7 +14,7 @@ import (
 
 // CLI is a struct that represents the command-line interface of the application.
 type CLI struct {
-	rootCmd   *cobra.Command
+	root      *cobra.Command
 	verbosity int
 }
 
@@ -103,17 +103,17 @@ func New(options RootCommandOptions) (*CLI, error) {
 
 	root.PersistentFlags().CountVarP(&verbosity, "verbose", "v", "Increase verbosity (up to -vvv)")
 	return &CLI{
-		rootCmd:   root,
+		root:      root,
 		verbosity: verbosity,
 	}, nil
 }
 
 // RegisterCommands registers new commands with the CLI
 func (cr *CLI) RegisterCommands(commands []*cobra.Command) {
-	cr.rootCmd.AddCommand(commands...)
+	cr.root.AddCommand(commands...)
 }
 
 // Execute executes the root command
 func (cr *CLI) Execute() error {
-	return cr.rootCmd.Execute()
+	return cr.root.Execute()
 }
