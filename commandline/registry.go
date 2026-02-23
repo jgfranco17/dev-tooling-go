@@ -25,7 +25,7 @@ type ContextModifiers func(ctx context.Context) context.Context
 
 // RootCommandOptions defines the options for creating a new CLI instance.
 type RootCommandOptions struct {
-	// Name is the name of the root command, i.e. the command used to invoke the CLI.
+	// Name is the name of the root command, i.e. the namespace used to invoke the CLI.
 	Name string
 
 	// Description is a brief description of the root command.
@@ -33,10 +33,10 @@ type RootCommandOptions struct {
 	Description string
 
 	// Version is the version of the root command.
-	// This will be displayed in the help message and can be used with the --version flag.
+	// This will be displayed in the --version flag.
 	Version string
 
-	// Modifiers are functions that can modify the context before executing the command.
+	// Modifiers are functions that can modify the context before executing.
 	// This can be used to add additional values to the context, such as a logger
 	// or other dependencies.
 	Modifiers []ContextModifiers
