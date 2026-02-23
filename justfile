@@ -4,10 +4,10 @@ _default:
 
 # Execute unit tests
 test:
-    go clean -testcache
-    go test -cover ./...
+    @go clean -testcache
+    @go test -race -cover ./...
 
 # Sync Go modules
 tidy:
-    @go mod tidy
+    go mod tidy
     @echo "Go modules synced successfully!"

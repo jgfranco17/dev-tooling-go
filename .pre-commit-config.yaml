@@ -1,11 +1,11 @@
 ---
-# Aeternum API pre-commit configuration
+# Pre-commit configuration
 
 fail_fast: false
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -21,15 +21,8 @@ repos:
       - id: go-mod-tidy
       - id: go-unit-tests
 
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v2.5.1
-    # Otherwise will fail on commit-msg hook
-    hooks:
-      - id: prettier
-        files: ^.*\.(go|json|yaml|yml)$
-
   - repo: https://github.com/codespell-project/codespell.git
-    rev: v2.2.6
+    rev: v2.4.1
     hooks:
       - id: codespell
         args: [-w]
